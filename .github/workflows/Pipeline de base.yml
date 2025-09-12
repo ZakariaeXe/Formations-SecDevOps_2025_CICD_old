@@ -94,6 +94,28 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+
+  secret-scan:
+    name: Gitleaks Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Historique complet pour scan approfondi
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: "--redact --report-path=gitleaks-report.json"
+
+      - name: Upload Gitleaks report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+          
   build:
     name: Build-NomPrenom-Organisme  # À personnaliser par chaque étudiant
     runs-on: ubuntu-latest
