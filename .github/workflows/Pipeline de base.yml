@@ -1,46 +1,80 @@
-name: CI Pipeline de Base
+name: Basic CI/CD Pipeline
 
-# Déclencheurs du workflow
+# Déclenchement sur push et pull request
 on:
-  # Exécute la pipeline à chaque push sur n'importe quelle branche
   push:
-  # Permet de lancer manuellement la pipeline depuis l'interface GitHub
-  workflow_dispatch:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Variables d'environnement globales
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Job unique pour construire et pousser l'image
-  build-and-push:
-    name: Build and Push Docker Image
-    # Utilise la dernière version d'un runner Ubuntu fourni par GitHub
+  # Job de base avec nom personnalisé
+  build:
+    name: Build-NomPrenom-Organisme  # À personnaliser par chaque étudiant
     runs-on: ubuntu-latest
     
-    # Définit les permissions nécessaires pour ce job (principe de moindre privilège)
+    # Permissions minimales nécessaires
     permissions:
-      contents: read      # Requis pour faire le checkout du code
-      packages: write      # Requis pour écrire (pousser) sur le registre de paquets GitHub (GHCR)
-
+      contents: read
+      packages: write
+    
+    # Outputs pour les jobs suivants
+    outputs:
+      image_name: ${{ steps.meta.outputs.tags }}
+      digest: ${{ steps.build.outputs.digest }}
+      image_uri: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+    
     steps:
-      # Étape 1: Récupérer le code du dépôt
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # Étape 2: Se connecter au registre de conteneurs de GitHub (GHCR)
-      # Utilise le GITHUB_TOKEN automatique pour une authentification sécurisée.
-      - name: Log in to the GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Étape 3: Construire et pousser l'image Docker
-      # Le tag de l'image est composé du nom du registre, du propriétaire du dépôt,
-      # d'un nom d'application fixe ("my-app") et du SHA du commit.
-      # Utiliser le SHA garantit que chaque image est unique et traçable.
-      - name: Build and push Docker image
-        id: build-and-push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/my-app:${{ github.sha }}
+    # 1. Checkout du code source
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    # 2. Configuration Docker Buildx (pour builds avancés)
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    # 3. Authentification au GitHub Container Registry
+    - name: Login to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}  # Token automatique GitHub
+    
+    # 4. Extraction des métadonnées (tags, labels)
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    # 5. Build et push de l'image Docker
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        # Cache pour optimiser les builds suivants
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    # 6. Affichage des informations de build
+    - name: Display build info
+      run: |
+        echo "✅ Image construite avec succès !"
+        echo "📦 Tags: ${{ steps.meta.outputs.tags }}"
+        echo "🔒 Digest: ${{ steps.build.outputs.digest }}"
+        echo "🌐 Registry: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
