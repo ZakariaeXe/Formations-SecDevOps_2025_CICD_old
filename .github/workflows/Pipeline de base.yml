@@ -209,21 +209,27 @@ jobs:
       run: |
         echo "🔍 Vérification de l'image construite..."
         echo "Image à vérifier: ${{ needs.build.outputs.image_uri }}"
-        
+        # --- CORRECTION ---
+        # Ajout d'une pause de 10 secondes pour laisser le temps au registre
+        # de propager le manifeste de l'image.
+        echo "⏳ Attente de 10s pour la propagation du registre..."
+        sleep 10
+        # --- FIN DE LA CORRECTION ---
+
         # Vérification que l'image existe
         if docker manifest inspect ${{ needs.build.outputs.image_uri }} > /dev/null 2>&1; then
           echo "✅ Image trouvée et accessible"
           echo "📊 Informations de l'image:"
           docker manifest inspect ${{ needs.build.outputs.image_uri }} | jq -r '.schemaVersion, .mediaType'
         else
-          echo "❌ Erreur: Image non trouvée ou inaccessible"
+          echo "❌ Erreur: Image non trouvée ou inaccessible après une attente."
           exit 1
         fi
-        
+
         echo ""
         echo "🎯 === RÉCAPITULATIF FINAL ==="
         echo "✅ Build: Succès"
-        echo "✅ Push: Succès" 
+        echo "✅ Push: Succès"
         echo "✅ Visibilité: Privée"
         echo "✅ SHA: ${{ needs.build.outputs.digest }}"
         echo "🚀 Pipeline de base complète et fonctionnelle !"
