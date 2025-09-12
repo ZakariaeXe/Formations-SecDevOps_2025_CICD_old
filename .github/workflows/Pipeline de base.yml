@@ -95,26 +95,33 @@ env:
 
 jobs:
 
-  secret-scan:
-    name: Gitleaks Secret Scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Historique complet pour scan approfondi
+secret-scan:
+  name: Gitleaks Secret Scan
+  runs-on: ubuntu-latest
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # Historique complet pour scan approfondi
 
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        with:
-          args: "--redact --report-path=gitleaks-report.json"
+    - name: Run Gitleaks
+      uses: gitleaks/gitleaks-action@v2
+      with:
+        # CORRECTION 1: Utiliser les paramètres spécifiques au lieu de 'args'
+        report_format: json
+        report_path: gitleaks-report.json
+        # CORRECTION 2: Dire à Gitleaks de scanner tout l'historique
+        scan_all: true
+        # Optionnel: Cache les secrets dans les logs pour la sécurité
+        redact: true
 
-      - name: Upload Gitleaks report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: gitleaks-report
-          path: gitleaks-report.json
+    - name: Upload Gitleaks report
+      uses: actions/upload-artifact@v4
+      # if: failure() est une bonne pratique pour n'uploader le rapport que si des secrets sont trouvés
+      if: failure()
+      with:
+        name: gitleaks-report
+        path: gitleaks-report.json
           
   build:
     name: Build-NomPrenom-Organisme  # À personnaliser par chaque étudiant
