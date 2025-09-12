@@ -213,9 +213,8 @@ jobs:
         # Ajout d'une pause de 10 secondes pour laisser le temps au registre
         # de propager le manifeste de l'image.
         echo "⏳ Attente de 10s pour la propagation du registre..."
-        sleep 10
+        sleep 30
         # --- FIN DE LA CORRECTION ---
-
         # Vérification que l'image existe
         if docker manifest inspect ${{ needs.build.outputs.image_uri }} > /dev/null 2>&1; then
           echo "✅ Image trouvée et accessible"
@@ -233,3 +232,4 @@ jobs:
         echo "✅ Visibilité: Privée"
         echo "✅ SHA: ${{ needs.build.outputs.digest }}"
         echo "🚀 Pipeline de base complète et fonctionnelle !"
+        
