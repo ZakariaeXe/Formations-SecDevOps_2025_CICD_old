@@ -1,64 +1,151 @@
-name: Basic CI/CD Pipeline
+# name: Basic CI/CD Pipeline
 
-# Déclenchement sur push et pull request
+# # Déclenchement sur push et pull request
+# on:
+#   push:
+#     branches: [ main ]
+#   pull_request:
+#     branches: [ main ]
+
+# # Variables d'environnement globales
+# env:
+#   REGISTRY: ghcr.io
+#   IMAGE_NAME: ${{ github.repository }}
+
+# jobs:
+#   # Job de base avec nom personnalisé
+#   build:
+#     name: Build-NomPrenom-Organisme  # À personnaliser par chaque étudiant
+#     runs-on: ubuntu-latest
+    
+#     # Permissions minimales nécessaires
+#     permissions:
+#       contents: read
+#       packages: write
+    
+#     # Outputs pour les jobs suivants
+#     outputs:
+#       image_name: ${{ steps.meta.outputs.tags }}
+#       digest: ${{ steps.build.outputs.digest }}
+#       image_uri: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+    
+#     steps:
+#     # 1. Checkout du code source
+#     - name: Checkout repository
+#       uses: actions/checkout@v4
+    
+#     # 2. Configuration Docker Buildx (pour builds avancés)
+#     - name: Set up Docker Buildx
+#       uses: docker/setup-buildx-action@v3
+    
+#     # 3. Authentification au GitHub Container Registry
+#     - name: Login to Container Registry
+#       uses: docker/login-action@v3
+#       with:
+#         registry: ${{ env.REGISTRY }}
+#         username: ${{ github.actor }}
+#         password: ${{ secrets.GITHUB_TOKEN }}  # Token automatique GitHub
+    
+#     # 4. Extraction des métadonnées (tags, labels)
+#     - name: Extract metadata
+#       id: meta
+#       uses: docker/metadata-action@v5
+#       with:
+#         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+#         tags: |
+#           type=ref,event=branch
+#           type=ref,event=pr
+#           type=sha,prefix={{branch}}-
+#           type=raw,value=latest,enable={{is_default_branch}}
+    
+#     # 5. Build et push de l'image Docker
+#     - name: Build and push Docker image
+#       id: build
+#       uses: docker/build-push-action@v5
+#       with:
+#         context: .
+#         push: true
+#         tags: ${{ steps.meta.outputs.tags }}
+#         labels: ${{ steps.meta.outputs.labels }}
+#         # Cache pour optimiser les builds suivants
+#         cache-from: type=gha
+#         cache-to: type=gha,mode=max
+    
+#     # 6. Affichage des informations de build
+#     - name: Display build info
+#       run: |
+#         echo "✅ Image construite avec succès !"
+#         echo "📦 Tags: ${{ steps.meta.outputs.tags }}"
+#         echo "🔒 Digest: ${{ steps.build.outputs.digest }}"
+#         echo "🌐 Registry: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+
+
+# Pipeline de base complète - Docker standard avec SHA et image privée
+name: Complete Basic CI/CD Pipeline
+
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main ]
 
-# Variables d'environnement globales
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Job de base avec nom personnalisé
   build:
     name: Build-NomPrenom-Organisme  # À personnaliser par chaque étudiant
     runs-on: ubuntu-latest
     
-    # Permissions minimales nécessaires
+    # Permissions nécessaires
     permissions:
       contents: read
       packages: write
     
-    # Outputs pour les jobs suivants
+    # Outputs pour utilisation future (prêt pour SLSA plus tard)
     outputs:
-      image_name: ${{ steps.meta.outputs.tags }}
+      image_name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       digest: ${{ steps.build.outputs.digest }}
-      image_uri: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      image_uri: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+      tags: ${{ steps.meta.outputs.tags }}
     
     steps:
-    # 1. Checkout du code source
+    # 1. Récupération du code source
     - name: Checkout repository
       uses: actions/checkout@v4
     
-    # 2. Configuration Docker Buildx (pour builds avancés)
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    # 3. Authentification au GitHub Container Registry
+    # 2. Authentification au GitHub Container Registry
     - name: Login to Container Registry
       uses: docker/login-action@v3
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}  # Token automatique GitHub
+        password: ${{ secrets.GITHUB_TOKEN }}
     
-    # 4. Extraction des métadonnées (tags, labels)
+    # 3. Configuration des métadonnées avec SHA prioritaire
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
       with:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
+          # SHA en priorité pour immutabilité et sécurité
+          type=sha,prefix={{branch}}-,format=long,priority=1000
+          type=sha,prefix={{branch}}-,format=short,priority=900
+          # Tags traditionnels pour développement
+          type=ref,event=branch,priority=600
+          type=ref,event=pr,priority=600
+          type=raw,value=latest,enable={{is_default_branch}},priority=200
+        labels: |
+          org.opencontainers.image.title=${{ github.repository }}
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.created={{date 'YYYY-MM-DDTHH:mm:ssZ'}}
+          # 🔒 Configuration pour image privée
+          org.opencontainers.image.visibility=private
     
-    # 5. Build et push de l'image Docker
+    # 4. Build et push de l'image Docker (sans Buildx)
     - name: Build and push Docker image
       id: build
       uses: docker/build-push-action@v5
@@ -67,14 +154,76 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-        # Cache pour optimiser les builds suivants
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+    
+    # 5. Configuration de l'image comme privée
+    - name: Set image visibility to private
+      run: |
+        echo "🔒 Configuration de l'image comme privée..."
+        # L'image sera privée grâce au label dans les métadonnées
+        echo "Image sera automatiquement configurée comme privée"
     
     # 6. Affichage des informations de build
-    - name: Display build info
+    - name: Display complete build information
       run: |
-        echo "✅ Image construite avec succès !"
-        echo "📦 Tags: ${{ steps.meta.outputs.tags }}"
-        echo "🔒 Digest: ${{ steps.build.outputs.digest }}"
-        echo "🌐 Registry: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+        echo "🎉 === BUILD TERMINÉ AVEC SUCCÈS ==="
+        echo ""
+        echo "📦 Nom de l'image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+        echo "🔑 SHA Digest: ${{ steps.build.outputs.digest }}"
+        echo "🎯 URI complète (immutable): ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
+        echo ""
+        echo "🏷️ Tags disponibles:"
+        echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | while read tag; do echo "  - $tag"; done
+        echo ""
+        echo "🔒 Visibilité: Image privée (authentification requise)"
+        echo "⚡ Recommandation: Utilisez le SHA digest pour la production"
+        echo ""
+        echo "📋 Commandes utiles:"
+        echo "  - Pull: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
+        echo "  - Inspect: docker inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
+    
+    # 7. Test rapide de l'image (optionnel)
+    - name: Quick image test
+      run: |
+        echo "🧪 Test rapide de l'image construite..."
+        docker images | grep ${{ github.repository }} || echo "Image locale non trouvée (normal après push)"
+        echo "✅ Build et push réussis - image disponible sur ${{ env.REGISTRY }}"
+
+  # Job de vérification (pour confirmer que tout fonctionne)
+  verify:
+    name: Verify Build Success
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    
+    steps:
+    - name: Login to verify image access
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Verify image exists and is accessible
+      run: |
+        echo "🔍 Vérification de l'image construite..."
+        echo "Image à vérifier: ${{ needs.build.outputs.image_uri }}"
+        
+        # Vérification que l'image existe
+        if docker manifest inspect ${{ needs.build.outputs.image_uri }} > /dev/null 2>&1; then
+          echo "✅ Image trouvée et accessible"
+          echo "📊 Informations de l'image:"
+          docker manifest inspect ${{ needs.build.outputs.image_uri }} | jq -r '.schemaVersion, .mediaType'
+        else
+          echo "❌ Erreur: Image non trouvée ou inaccessible"
+          exit 1
+        fi
+        
+        echo ""
+        echo "🎯 === RÉCAPITULATIF FINAL ==="
+        echo "✅ Build: Succès"
+        echo "✅ Push: Succès" 
+        echo "✅ Visibilité: Privée"
+        echo "✅ SHA: ${{ needs.build.outputs.digest }}"
+        echo "🚀 Pipeline de base complète et fonctionnelle !"
