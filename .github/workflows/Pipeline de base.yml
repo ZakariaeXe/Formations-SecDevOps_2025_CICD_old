@@ -68,19 +68,19 @@ jobs:
 
 
   SCA-scan:
-    name: Run OSV Scanner for SCA
-    runs-on: ubuntu-latest  
-
-    steps:
-      - name: Run OSV Scanner
-        uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.2.2"  
-        with:
-          path: .  
-
-      - name: Upload SARIF report to GitHub Security
-        uses: github/codeql-action/upload-sarif@v2  
-        with:
-          sarif_file: osv-scanner-report.sarif  
+      name: Run OSV Scanner for SCA
+      uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.2.2
+      permissions:
+        contents: read
+        security-events: write
+        actions: read
+      with:
+        # Paramètres du workflow réutilisable
+        scan-args: |-
+          --format=sarif
+          --output=osv-scanner-report.sarif
+          .
+        upload-sarif: true
           
   build:
     name: AMAATI-ZAKI  # À personnaliser par chaque étudiant
