@@ -84,29 +84,17 @@ jobs:
 
   SCA-scan:
     name: Run OSV Scanner for SCA
-    runs-on: ubuntu-latest
+    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.2.2"
     permissions:
-      contents: read
+      actions: read
       security-events: write
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-      
-    - name: Run OSV Scanner
-      uses: google/osv-scanner-action@v1.8.5  # Version avec action directe
-      with:
-        scan-args: |-
-            --format=sarif
-            --output=results.sarif
-            ./
-        continue-on-error: true
-      
-    - name: Upload SARIF to GitHub Security
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
-      with:
-        sarif_file: results.sarif
+      contents: read
+    with:
+      scan-args: |-
+        --recursive
+        ./
+      upload-sarif: true
+      fail-on-vuln: true
           
   build:
     name: AMAATI-ZAKI  # À personnaliser par chaque étudiant
