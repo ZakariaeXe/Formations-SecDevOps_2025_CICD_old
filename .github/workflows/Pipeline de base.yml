@@ -31,7 +31,7 @@ jobs:
       with:
         path: ./
 
-  scan:
+  secret-scaning:
     name: secret scanning with gitleaks
     runs-on: ubuntu-latest
     steps:
@@ -42,26 +42,6 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  cleanup-security-results:
-    name: Clean existing security results
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-      actions: write
-    steps:
-      - name: Clean CodeQL and other SARIF results
-        run: |
-          # Supprimer tous les résultats SARIF existants via l'API GitHub
-          curl -L \
-            -X DELETE \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${{ github.repository }}/code-scanning/analyses" || true
-          
-          echo "Security results cleaned"
 
   sast-scan:
     name: Semgrep SAST Scan
@@ -85,6 +65,22 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: semgrep.sarif
+
+
+  SCA-scan:
+    name: Run OSV Scanner for SCA
+    runs-on: ubuntu-latest  
+
+    steps:
+      - name: Run OSV Scanner
+        uses: google/osv-scanner-action@v2  
+        with:
+          path: .  
+
+      - name: Upload SARIF report to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2  
+        with:
+          sarif_file: osv-scanner-report.sarif  
           
   build:
     name: AMAATI-ZAKI  # À personnaliser par chaque étudiant
