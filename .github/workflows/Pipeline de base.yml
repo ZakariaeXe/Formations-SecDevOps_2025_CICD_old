@@ -36,6 +36,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Clean gitleaks cache
+        run: |
+         rm -rf ~/.cache/gitleaks 2>/dev/null || true
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
