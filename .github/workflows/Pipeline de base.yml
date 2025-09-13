@@ -38,7 +38,10 @@ jobs:
           fetch-depth: 0
       - name: Clean gitleaks cache
         run: |
-         rm -rf ~/.cache/gitleaks 2>/dev/null || true
+          rm -rf ~/.cache/gitleaks* 2>/dev/null || true
+          rm -rf .git/gitleaks* 2>/dev/null || true
+          rm -rf /tmp/gitleaks* 2>/dev/null || true
+          find . -name ".gitleaks*" -type f -delete 2>/dev/null || true
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
