@@ -111,7 +111,6 @@ jobs:
       uses: trufflesecurity/trufflehog@main
       with:
         path: ./
-        extra_args: --sarif --output report.sarif --only-verified
   # scan:
   #   name: secret scanning with gitleaks
   #   runs-on: ubuntu-latest
