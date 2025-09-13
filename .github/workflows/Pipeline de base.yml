@@ -14,22 +14,23 @@ env:
 jobs:
 
 
-  # secret_scan:
-  #   name: TruffleHog Secret Scan
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: read
-  #     security-events: write
-  #   steps:
-  #   - name: Checkout repository
-  #     uses: actions/checkout@v4
-  #     with:
-  #       fetch-depth: 0
+  secret_scan:
+    name: TruffleHog Secret Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
         
-  #   - name: Run TruffleHog to find secrets
-  #     uses: trufflesecurity/trufflehog@main
-  #     with:
-  #       path: ./
+    - name: Run TruffleHog to find secrets
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+
   scan:
     name: secret scanning with gitleaks
     runs-on: ubuntu-latest
@@ -37,22 +38,33 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Run gitleaks with Docker
-        run: |
-          docker run --rm -v "$PWD:/path" zricethezav/gitleaks:latest \
-            detect --source /path --no-git --redact --verbose --exit-code 1
-  # scan:
-  #   name: secret scanning with gitleaks
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         fetch-depth: 0
 
-  #     - uses: gitleaks/gitleaks-action@v2
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sast-scan:
+    name: Semgrep SAST Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: semgrep/semgrep
+
+    if: (github.actor != 'dependabot[bot]')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Run Semgrep Scan
+        run: semgrep scan --config auto --sarif --output semgrep.sarif || true
+
+      - name: Upload Semgrep SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
           
   build:
     name: AMAATI-ZAKI  # À personnaliser par chaque étudiant
