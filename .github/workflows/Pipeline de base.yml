@@ -12,6 +12,18 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clear GitHub Actions cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache
+            /tmp
+          key: gitleaks-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            gitleaks-
 
   # secret_scan:
   #   name: TruffleHog Secret Scan
@@ -36,24 +48,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Create gitleaks config
-        run: |
-          cat > .gitleaks.toml << EOF
-          [extend]
-          useDefault = true
-          
-          [allowlist]
-          description = "Force full scan"
-          stopwords = []
-          EOF
 
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_CONFIG: .gitleaks.toml
-        with:
-          args: '--config .gitleaks.toml --no-git --redact --verbose'
-
+          
   build:
     name: AMAATI-ZAKI  # À personnaliser par chaque étudiant
     runs-on: ubuntu-latest
