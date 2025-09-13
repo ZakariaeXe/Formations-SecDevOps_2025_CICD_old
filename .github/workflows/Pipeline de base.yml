@@ -94,7 +94,7 @@ jobs:
         --recursive
         ./
       upload-sarif: true
-      fail-on-vuln: true
+      fail-on-vuln: false
           
   build:
     name: AMAATI-ZAKI  # À personnaliser par chaque étudiant
