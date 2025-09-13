@@ -89,18 +89,24 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
       
-      - name: Run OSV Scanner
-        uses: google/osv-scanner-action@v2.2.2
-        with:
-          scan-args: |-
+    - name: Run OSV Scanner
+      uses: google/osv-scanner-action@v1.8.5  # Version avec action directe
+      with:
+        scan-args: |-
             --format=sarif
             --output=results.sarif
             ./
         continue-on-error: true
+      
+    - name: Upload SARIF to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: results.sarif
           
   build:
     name: AMAATI-ZAKI  # À personnaliser par chaque étudiant
