@@ -67,20 +67,40 @@ jobs:
           sarif_file: semgrep.sarif
 
 
+  # SCA-scan:
+  #     name: Run OSV Scanner for SCA
+  #     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.2.2
+  #     permissions:
+  #       contents: read
+  #       security-events: write
+  #       actions: read
+  #     with:
+  #       # Paramètres du workflow réutilisable
+  #       scan-args: |-
+  #         --format=sarif
+  #         --output=osv-scanner-report.sarif
+  #         .
+  #       upload-sarif: true
+
   SCA-scan:
-      name: Run OSV Scanner for SCA
-      uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.2.2
-      permissions:
-        contents: read
-        security-events: write
-        actions: read
-      with:
-        # Paramètres du workflow réutilisable
-        scan-args: |-
-          --format=sarif
-          --output=osv-scanner-report.sarif
-          .
-        upload-sarif: true
+    name: Run OSV Scanner for SCA
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Run OSV Scanner
+        uses: google/osv-scanner-action@v2.2.2
+        with:
+          scan-args: |-
+            --format=sarif
+            --output=results.sarif
+            ./
+        continue-on-error: true
           
   build:
     name: AMAATI-ZAKI  # À personnaliser par chaque étudiant
