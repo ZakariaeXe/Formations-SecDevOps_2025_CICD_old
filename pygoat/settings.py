@@ -170,3 +170,37 @@ SOCIALACCOUNT_PROVIDERS = {
 
 SECRET_COOKIE_KEY = "PYGOAT"
 CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:8000","http://0.0.0.0:8000","http://172.16.189.10"]
+
+# ❌ MAUVAISES PRATIQUES - Secrets en dur (à des fins de test)
+SECRET_KEY = 'django-insecure-test-key-abc123456789def!@#$%^&*()_+-='
+
+# Base de données avec credentials
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'pygoat_db',
+        'USER': 'admin',
+        'PASSWORD': 'SuperSecretPassword123!',
+        'HOST': 'localhost',
+        'PORT': '5432',
+    }
+}
+
+# API Keys (seront détectées)
+AWS_ACCESS_KEY_ID = 'AKIAIOSFODNN7EXAMPLE'
+AWS_SECRET_ACCESS_KEY = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
+
+STRIPE_API_KEY = 'sk_test_4eC39HqLyjWDarjtT1zdp7dc'
+STRIPE_PUBLISHABLE_KEY = 'pk_test_TYooMQauvdEDq54NiTphI7jx'
+
+# GitHub Token
+GITHUB_TOKEN = 'ghp_1234567890abcdef1234567890abcdef12345678'
+
+# JWT Secret
+JWT_SECRET = 'jwt-secret-key-for-authentication-12345'
+
+# Email credentials
+EMAIL_HOST_PASSWORD = 'smtp_password_123456'
+
+# Redis connection string
+REDIS_URL = 'redis://user:password123@redis-server:6379/0'
