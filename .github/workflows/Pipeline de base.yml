@@ -34,19 +34,14 @@ jobs:
     name: secret scanning with gitleaks
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    
-    - name: Run gitleaks scan on all files
-      run: |
-        # Installation directe de gitleaks
-        wget -O gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz
-        tar -xzf gitleaks.tar.gz
-        chmod +x gitleaks
-        
-        # Scan TOUS les fichiers, pas seulement les changements
-        ./gitleaks detect --source . --no-git --redact --verbose --exit-code 1
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Run gitleaks with Docker
+        run: |
+          docker run --rm -v "$PWD:/path" zricethezav/gitleaks:latest \
+            detect --source /path --no-git --redact --verbose --exit-code 1
   # scan:
   #   name: secret scanning with gitleaks
   #   runs-on: ubuntu-latest
