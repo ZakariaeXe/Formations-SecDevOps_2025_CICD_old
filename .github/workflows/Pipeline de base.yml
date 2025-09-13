@@ -42,6 +42,7 @@ jobs:
   #     with:
   #       path: ./
   scan:
+    needs: prepare
     name: secret scanning with gitleaks
     runs-on: ubuntu-latest
     steps:
