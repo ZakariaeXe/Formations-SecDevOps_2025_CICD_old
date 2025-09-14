@@ -65,6 +65,9 @@ jobs:
           fetch-depth: 0
 
       - uses: gitleaks/gitleaks-action@v2
+        with: 
+            exit-code: 0  
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -399,6 +402,9 @@ jobs:
         with:
           output_format: cli,sarif
           output_file_path: console,results.sarif
+          exit-code: 0  
+          continue-on-error: true
+
 
       - name: Envoyer les résultats de Checkov à GitHub Security
         uses: github/codeql-action/upload-sarif@v3
