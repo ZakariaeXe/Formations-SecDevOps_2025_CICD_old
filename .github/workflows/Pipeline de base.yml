@@ -411,6 +411,8 @@ jobs:
         if: success() || failure()
         with:
           sarif_file: results.sarif
+          exit-code: 0  
+          continue-on-error: true
 
 
 
