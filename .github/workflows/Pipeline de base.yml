@@ -380,29 +380,10 @@ jobs:
       - name: Generate SLSA Provenance
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ needs.build-and-push-image.outputs.image_name }}
-          subject-digest: ${{ needs.build-and-push-image.outputs.digest }}
+          subject-name: ${{ needs.push-image.outputs.image_name }}
+          subject-digest: ${{ needs.push-image.outputs.digest }}
           push-to-registry: true
-  # sbom-generation:
-  #   name: Generate SBOM
-  #   needs: push-image
-  #   runs-on: ubuntu-latest
-  #   steps:
 
-  #     - name: Generate SBOM with Syft
-  #       uses: anchore/sbom-action@v0
-  #       with:
-  #         image: ${{ steps.vars.outputs.first_tag }}  
-  #         format: "json"
-  #         output: "sbom.json"   
-          
-  #     # ➡️ NOUVELLE ÉTAPE : Envoi du rapport SBOM comme artefact
-  #     - name: Upload SBOM as artifact
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: sbom-report-${{ github.run_id }}
-  #         path: sbom.json
-  #         retention-days: 1  
  
   iac-scan:
     name: IaC Scan with Checkov
