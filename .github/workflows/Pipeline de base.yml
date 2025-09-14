@@ -451,7 +451,7 @@ jobs:
   
   sbom-generation:
     name: Generate SBOM
-    needs: build-image # Ce job dépend de la construction de l'image
+    needs: push-image
     runs-on: ubuntu-latest
     steps:
 
