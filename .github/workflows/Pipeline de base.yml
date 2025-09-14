@@ -222,7 +222,7 @@ jobs:
   #         name: sbom-report
   #         path: sbom.json  
 
-  sbom-generation-scan:
+  sbom-generation:
     name: SBOM & Vulnerability Scan
     needs: build-image # Dépend du job de build
     runs-on: ubuntu-latest
@@ -240,7 +240,7 @@ jobs:
           
       - name: Generate SBOM
         id: syft
-        uses: anchore/sbom-action@v0
+        uses: advanced-security/sbom-generator-action@v0.0.1
         with:
           image: "${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }}"
           format: spdx-json
