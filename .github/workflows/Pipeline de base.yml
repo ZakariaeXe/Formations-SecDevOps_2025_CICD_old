@@ -377,6 +377,14 @@ jobs:
       attestations: write # Requis pour enregistrer l'attestation
       id-token: write      # Requis pour la signature sans clé via OIDC
     steps:
+    
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
       - name: Generate SLSA Provenance
         uses: actions/attest-build-provenance@v1
         with:
