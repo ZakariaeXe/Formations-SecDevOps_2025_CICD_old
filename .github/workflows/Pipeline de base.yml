@@ -1,29 +1,3 @@
-    # # 4. Build et push de l'image Docker (sans Buildx)
-    # - name: Build and push Docker image
-    #   id: build
-    #   uses: docker/build-push-action@v5
-    #   with:
-    #     context: .
-    #     push: true
-    #     tags: ${{ steps.meta.outputs.tags }}
-    #     labels: ${{ steps.meta.outputs.labels }}
-
-      # SCA-scan:
-  #     name: Run OSV Scanner for SCA
-  #     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.2.2
-  #     permissions:
-  #       contents: read
-  #       security-events: write
-  #       actions: read
-  #     with:
-  #       # Paramètres du workflow réutilisable
-  #       scan-args: |-
-  #         --format=sarif
-  #         --output=osv-scanner-report.sarif
-  #         .
-  #       upload-sarif: true
-
-# Pipeline de base complète - Docker standard avec SHA et image privée#
 name: Complete Basic CI/CD Pipeline
 
 on:
@@ -173,23 +147,21 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # # ➡️ NOUVELLE ÉTAPE : Génération de la SBOM
-      # - name: Generate SBOM
-      #   id: syft
-      #   uses: anchore/sbom-action@v0
-      #   with:
-      #     image: "oci:${{ steps.build.outputs.digest }}"
-      #     format: "spdx-json"
-      #     output-file: "sbom.json"
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.vars.outputs.first_tag }}  
+          format: "json"
+          output: "sbom.json"   
           
-      # # ➡️ NOUVELLE ÉTAPE : Envoi du rapport SBOM comme artefact
-      # - name: Upload SBOM as artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: sbom-report-${{ github.run_id }}
-      #     path: sbom.json
-      #     retention-days: 1
-      
+      # ➡️ NOUVELLE ÉTAPE : Envoi du rapport SBOM comme artefact
+      - name: Upload SBOM as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-report-${{ github.run_id }}
+          path: sbom.json
+          retention-days: 1  
+
       # 5. Sauvegarde de l'image pour le job suivant
       - name: Save Docker image as artifact
         run: |
@@ -219,50 +191,6 @@ jobs:
           echo ""
           echo "➡️  Image prête pour scan de sécurité..."
   
-
-
-
-  # sbom-generation:
-  #   name: SBOM & Vulnerability Scan
-  #   needs: build-image # Dépend du job de build
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: read
-  #     packages: write
-  #     security-events: write
-  #   steps:
-  #     - name: Login to Container Registry
-  #       uses: docker/login-action@v3
-  #       with:
-  #         registry: ${{ env.REGISTRY }}
-  #         username: ${{ github.actor }}
-  #         password: ${{ secrets.GITHUB_TOKEN }}
-          
-  #     # - name: Generate SBOM
-  #     #   id: syft
-  #     #   uses: advanced-security/sbom-generator-action@v0.0.1
-  #     #   with:
-  #     #     image: "${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }}"
-  #     #     format: spdx-json
-  #     #     output-file: sbom.json
-      
-  #     - name: Generate SBOM with Syft
-  #       uses: anchore/sbom-action@v0
-  #       with:
-  #         image: "${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }}"
-  #         format: "json"
-  #         output: "sbom.json"   
-          
-  #     - name: Upload SBOM to GitHub as artifact
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: sbom-report
-  #         path: sbom.json
-
-  #     - name: Upload SBOM to registry (as OCI artifact)
-  #       run: |
-  #         docker run --rm -v "${PWD}:/workspace" anchore/syft-action@v0 scan ${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }} --output spdx-json > sbom.json
-  #         cosign attach sbom sbom.json --artifact ${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }}
 
   # 2️⃣ JOB SCAN - Scanner de sécurité des containers
   container-scan:
@@ -449,35 +377,26 @@ jobs:
           echo "  - Pull: docker pull ${{ needs.build-image.outputs.image_name }}@${{ steps.push.outputs.digest }}"
           echo "  - Inspect: docker inspect ${{ needs.build-image.outputs.image_name }}@${{ steps.push.outputs.digest }}"
   
-  sbom-generation:
-    name: Generate SBOM
-    needs: push-image
-    runs-on: ubuntu-latest
-    steps:
+  # sbom-generation:
+  #   name: Generate SBOM
+  #   needs: push-image
+  #   runs-on: ubuntu-latest
+  #   steps:
 
-      - name: Generate SBOM with Syft
-        uses: anchore/sbom-action@v0
-        with:
-          image: ${{ steps.vars.outputs.first_tag }}  
-          format: "json"
-          output: "sbom.json"   
+  #     - name: Generate SBOM with Syft
+  #       uses: anchore/sbom-action@v0
+  #       with:
+  #         image: ${{ steps.vars.outputs.first_tag }}  
+  #         format: "json"
+  #         output: "sbom.json"   
           
-      # # ➡️ NOUVELLE ÉTAPE : Génération de la SBOM
-      # - name: Generate SBOM
-      #   id: syft
-      #   uses: anchore/sbom-action@v0
-      #   with:
-      #     image: "oci:${{ steps.build.outputs.digest }}"
-      #     format: "spdx-json"
-      #     output-file: "sbom.json"
-          
-      # # ➡️ NOUVELLE ÉTAPE : Envoi du rapport SBOM comme artefact
-      # - name: Upload SBOM as artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: sbom-report-${{ github.run_id }}
-      #     path: sbom.json
-      #     retention-days: 1  
+  #     # ➡️ NOUVELLE ÉTAPE : Envoi du rapport SBOM comme artefact
+  #     - name: Upload SBOM as artifact
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: sbom-report-${{ github.run_id }}
+  #         path: sbom.json
+  #         retention-days: 1  
  
   iac-scan:
     name: IaC Scan with Checkov
