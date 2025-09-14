@@ -238,13 +238,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
           
-      - name: Generate SBOM
-        id: syft
-        uses: advanced-security/sbom-generator-action@v0.0.1
+      # - name: Generate SBOM
+      #   id: syft
+      #   uses: advanced-security/sbom-generator-action@v0.0.1
+      #   with:
+      #     image: "${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }}"
+      #     format: spdx-json
+      #     output-file: sbom.json
+      
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@v0
         with:
           image: "${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }}"
-          format: spdx-json
-          output-file: sbom.json
+          format: "json"
+          output: "sbom.json"   
           
       - name: Upload SBOM to GitHub as artifact
         uses: actions/upload-artifact@v4
