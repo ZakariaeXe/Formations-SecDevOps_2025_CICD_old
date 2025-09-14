@@ -220,27 +220,7 @@ jobs:
           echo "➡️  Image prête pour scan de sécurité..."
   
 
-  sbom-generation:
-    name: Generate SBOM
-    needs: build-image # Ce job dépend de la construction de l'image
-    runs-on: ubuntu-latest
-    steps:
-      # ➡️ NOUVELLE ÉTAPE : Génération de la SBOM
-      - name: Generate SBOM
-        id: syft
-        uses: anchore/sbom-action@v0
-        with:
-          image: "oci:${{ steps.build.outputs.digest }}"
-          format: "spdx-json"
-          output-file: "sbom.json"
-          
-      # ➡️ NOUVELLE ÉTAPE : Envoi du rapport SBOM comme artefact
-      - name: Upload SBOM as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom-report-${{ github.run_id }}
-          path: sbom.json
-          retention-days: 1
+
 
   # sbom-generation:
   #   name: SBOM & Vulnerability Scan
@@ -468,7 +448,29 @@ jobs:
           echo "📋 Commandes utiles:"
           echo "  - Pull: docker pull ${{ needs.build-image.outputs.image_name }}@${{ steps.push.outputs.digest }}"
           echo "  - Inspect: docker inspect ${{ needs.build-image.outputs.image_name }}@${{ steps.push.outputs.digest }}"
-    
+  
+  sbom-generation:
+    name: Generate SBOM
+    needs: build-image # Ce job dépend de la construction de l'image
+    runs-on: ubuntu-latest
+    steps:
+      # ➡️ NOUVELLE ÉTAPE : Génération de la SBOM
+      - name: Generate SBOM
+        id: syft
+        uses: anchore/sbom-action@v0
+        with:
+          image: "oci:${{ steps.build.outputs.digest }}"
+          format: "spdx-json"
+          output-file: "sbom.json"
+          
+      # ➡️ NOUVELLE ÉTAPE : Envoi du rapport SBOM comme artefact
+      - name: Upload SBOM as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-report-${{ github.run_id }}
+          path: sbom.json
+          retention-days: 1  
+ 
   iac-scan:
     name: IaC Scan with Checkov
     runs-on: ubuntu-latest
