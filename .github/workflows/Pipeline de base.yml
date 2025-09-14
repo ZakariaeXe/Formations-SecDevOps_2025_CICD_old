@@ -95,9 +95,9 @@ jobs:
     
     # Outputs pour les jobs suivants et SLSA
     outputs:
-      image_name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      image_name: ${{ steps.normalize.outputs.image_fqn }}
       digest: ${{ steps.build.outputs.digest }}
-      image_uri: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+      image_uri: ${{ steps.normalize.outputs.image_fqn }}@${{ steps.build.outputs.digest }}
       tags: ${{ steps.meta.outputs.tags }}
       tags_json: ${{ steps.meta.outputs.json }}
       
@@ -105,6 +105,15 @@ jobs:
       # 1. Récupération du code source
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Normalize image name
+        id: normalize
+        run: |
+          raw="${{ env.IMAGE_NAME }}"
+          norm="$(echo "$raw" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._\/-]/-/g' | sed -E 's/_/-/g')"
+          echo "image_repo=$norm" >> $GITHUB_OUTPUT
+          echo "image_fqn=${{ env.REGISTRY }}/$norm" >> $GITHUB_OUTPUT
+          echo "Using image: ${{ env.REGISTRY }}/$norm"
       
       # 2. Authentification au GitHub Container Registry
       - name: Login to Container Registry
@@ -119,7 +128,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ steps.normalize.outputs.image_fqn }}
           tags: |
             # SHA en priorité pour immutabilité et sécurité
             type=sha,prefix={{branch}}-,format=long,priority=1000
@@ -146,6 +155,12 @@ jobs:
           load: true   # ✅ Charge l'image localement pour le scan suivant
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+      
+      - name: Pick first tag
+        id: vars
+        run: |
+          echo "first_tag=$(echo '${{ steps.meta.outputs.tags }}' | cut -d',' -f1)" >> $GITHUB_OUTPUT
+          echo "First tag: ${{ steps.vars.outputs.first_tag }}"
 
       - name: Generate SBOM with Syft
         uses: anchore/sbom-action@v0
@@ -377,7 +392,8 @@ jobs:
       attestations: write # Requis pour enregistrer l'attestation
       id-token: write      # Requis pour la signature sans clé via OIDC
       contents: read
-      packages: read  
+      packages: write  
+      
     steps:
     
       - name: Login to Container Registry
