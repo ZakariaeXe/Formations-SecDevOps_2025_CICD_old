@@ -151,16 +151,9 @@ jobs:
         uses: anchore/sbom-action@v0
         with:
           image: ${{ steps.vars.outputs.first_tag }}  
-          format: "json"
-          output: "sbom.json"   
-          
-      # ➡️ NOUVELLE ÉTAPE : Envoi du rapport SBOM comme artefact
-      - name: Upload SBOM as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom-report-${{ github.run_id }}
-          path: sbom.json
-          retention-days: 1  
+          format: spdx-json
+          artifact-name: sbom-${{ github.run_id }}.spdx.json
+      
 
       # 5. Sauvegarde de l'image pour le job suivant
       - name: Save Docker image as artifact
