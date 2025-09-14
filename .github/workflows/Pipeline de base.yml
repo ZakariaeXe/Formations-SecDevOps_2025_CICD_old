@@ -383,13 +383,7 @@ jobs:
           echo "📋 Commandes utiles:"
           echo "  - Pull: docker pull ${{ needs.build-image.outputs.image_name }}@${{ steps.push.outputs.digest }}"
           echo "  - Inspect: docker inspect ${{ needs.build-image.outputs.image_name }}@${{ steps.push.outputs.digest }}"
-      
-      # 8. Test rapide de l'image
-      - name: Quick image test
-        run: |
-          echo "🧪 Test rapide de l'image publiée..."
-          echo "✅ Build, scan et push réussis - image disponible sur ${{ env.REGISTRY }}"
-          echo "📊 Statistiques: Build ✅ | Scan ✅ 
+
 
 
 
