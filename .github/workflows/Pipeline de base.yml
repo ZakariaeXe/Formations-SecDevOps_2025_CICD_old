@@ -369,7 +369,20 @@ jobs:
           echo "📋 Commandes utiles:"
           echo "  - Pull: docker pull ${{ needs.build-image.outputs.image_name }}@${{ steps.push.outputs.digest }}"
           echo "  - Inspect: docker inspect ${{ needs.build-image.outputs.image_name }}@${{ steps.push.outputs.digest }}"
-  
+  attest:
+    name: Generate SLSA Provenance
+    needs: push-image # Dépend du job de build et de push
+    runs-on: ubuntu-latest
+    permissions:
+      attestations: write # Requis pour enregistrer l'attestation
+      id-token: write      # Requis pour la signature sans clé via OIDC
+    steps:
+      - name: Generate SLSA Provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ needs.build-and-push-image.outputs.image_name }}
+          subject-digest: ${{ needs.build-and-push-image.outputs.digest }}
+          push-to-registry: true
   # sbom-generation:
   #   name: Generate SBOM
   #   needs: push-image
