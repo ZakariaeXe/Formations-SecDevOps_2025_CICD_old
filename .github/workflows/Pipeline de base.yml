@@ -147,9 +147,46 @@ jobs:
           # 🔒 Configuration pour image privée
           org.opencontainers.image.visibility=private
     
-    # 4. Build et push de l'image Docker (sans Buildx)
-    - name: Build and push Docker image
+    # # 4. Build et push de l'image Docker (sans Buildx)
+    # - name: Build and push Docker image
+    #   id: build
+    #   uses: docker/build-push-action@v5
+    #   with:
+    #     context: .
+    #     push: true
+    #     tags: ${{ steps.meta.outputs.tags }}
+    #     labels: ${{ steps.meta.outputs.labels }}
+
+        # 1. BUILD SEULEMENT (sans push)
+    - name: Build Docker image
       id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false  
+        load: true   
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+    
+    # 2. SCANNER L'IMAGE
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        exit-code: 0  
+        severity: 'CRITICAL,HIGH'
+    
+    - name: Upload Trivy scan results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: trivy-results.sarif
+    
+    # 3. PUSH SEULEMENT SI SCAN RÉUSSI
+    - name: Push Docker image
+      if: success()  
       uses: docker/build-push-action@v5
       with:
         context: .
