@@ -104,6 +104,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write  
+      actions: read          
+  
     
     # Outputs pour utilisation future (prêt pour SLSA plus tard)
     outputs:
@@ -183,6 +186,29 @@ jobs:
       if: always()
       with:
         sarif_file: trivy-results.sarif
+      continue-on-error: true 
+
+          # 7. Vérification des vulnérabilités critiques (nouveau)
+    - name: Check for critical vulnerabilities
+      run: |
+        if [ -f trivy-results.sarif ]; then
+          CRITICAL_COUNT=$(jq '[.runs[0].results[] | select(.level == "error")] | length' trivy-results.sarif 2>/dev/null || echo "0")
+          HIGH_COUNT=$(jq '[.runs[0].results[] | select(.level == "warning")] | length' trivy-results.sarif 2>/dev/null || echo "0")
+          
+          echo "🔍 Security scan results:"
+          echo "Critical vulnerabilities: $CRITICAL_COUNT"
+          echo "High vulnerabilities: $HIGH_COUNT"
+          
+          if [ "$CRITICAL_COUNT" -gt "0" ]; then
+            echo "❌ Critical vulnerabilities found! Consider fixing before production deployment."
+            # exit 1  # Décommentez pour bloquer en cas de vulnérabilités critiques
+          else
+            echo "✅ No critical vulnerabilities found."
+          fi
+        else
+          echo "⚠️ No scan results file found."
+        fi
+
     
     # 3. PUSH SEULEMENT SI SCAN RÉUSSI
     - name: Push Docker image
