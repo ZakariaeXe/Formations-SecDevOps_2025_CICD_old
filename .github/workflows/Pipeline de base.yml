@@ -111,7 +111,7 @@ jobs:
 
 # 1️⃣ JOB BUILD - Construction de l'image Docker
   build-image:
-    name: 🔨 BUILD - Docker Image Construction
+    name:  BUILD - Docker Image Construction
     runs-on: ubuntu-latest
     
     permissions:
@@ -202,6 +202,25 @@ jobs:
           echo ""
           echo "➡️  Image prête pour scan de sécurité..."
   
+
+  sbom-generation:
+    name: Generate SBOM
+    needs: build-image # Ce job dépend de la construction de l'image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate SBOM for image
+        uses: anchore/syft-action@v0
+        with:
+          # Utilise le nom et le digest de l'image générée dans le job précédent
+          image: "${{ needs.build.outputs.image_name }}@${{ needs.build.outputs.digest }}"
+          format: spdx-json
+          output-file: sbom.json
+
+      - name: Envoyer le rapport SBOM comme artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-report
+          path: sbom.json  
   # 2️⃣ JOB SCAN - Scanner de sécurité des containers
   container-scan:
     name: 🔍 SCAN - Container Security Analysis  
