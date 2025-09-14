@@ -155,19 +155,20 @@ jobs:
           load: true   # ✅ Charge l'image localement pour le scan suivant
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-      
-      - name: Pick first tag
-        id: vars
-        run: |
-          echo "first_tag=$(echo '${{ steps.meta.outputs.tags }}' | cut -d',' -f1)" >> $GITHUB_OUTPUT
-          echo "First tag: ${{ steps.vars.outputs.first_tag }}"
-
+    
       - name: Generate SBOM with Syft
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ steps.vars.outputs.first_tag }}  
+          image: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
           format: spdx-json
           artifact-name: sbom-${{ github.run_id }}.spdx.json
+          
+      # - name: Generate SBOM with Syft
+      #   uses: anchore/sbom-action@v0
+      #   with:
+      #     image: ${{ steps.vars.outputs.first_tag }}  
+      #     format: spdx-json
+      #     artifact-name: sbom-${{ github.run_id }}.spdx.json
       
 
       # 5. Sauvegarde de l'image pour le job suivant
