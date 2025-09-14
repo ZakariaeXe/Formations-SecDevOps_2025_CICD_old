@@ -376,6 +376,8 @@ jobs:
     permissions:
       attestations: write # Requis pour enregistrer l'attestation
       id-token: write      # Requis pour la signature sans clé via OIDC
+      contents: read
+      packages: read  
     steps:
     
       - name: Login to Container Registry
@@ -384,13 +386,42 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify image exists
+        run: |
+          echo "🔍 Vérification de l'existence de l'image..."
+          echo "Image: ${{ needs.push-image.outputs.image_name }}"
+          echo "Digest: ${{ needs.push-image.outputs.digest }}"
           
+          # Vérifier le manifest
+          docker manifest inspect "${{ needs.push-image.outputs.image_name }}@${{ needs.push-image.outputs.digest }}" || {
+            echo "❌ Image non trouvée avec ce digest !"
+            echo "📋 Images disponibles :"
+            docker images --filter "reference=${{ needs.push-image.outputs.image_name }}"
+            exit 1
+          }
+          echo "✅ Image trouvée et accessible"
+      
+      # ✅ NOUVEAU: Attendre que l'image soit complètement disponible
+      - name: Wait for image availability
+        run: |
+          echo "⏳ Attente de la disponibilité complète de l'image..."
+          for i in {1..30}; do
+            if docker manifest inspect "${{ needs.push-image.outputs.image_name }}@${{ needs.push-image.outputs.digest }}" >/dev/null 2>&1; then
+              echo "✅ Image disponible après ${i} tentatives"
+              break
+            fi
+            echo "⏳ Tentative $i/30..."
+            sleep 10
+          done
+        
       - name: Generate SLSA Provenance
         uses: actions/attest-build-provenance@v1
         with:
           subject-name: ${{ needs.push-image.outputs.image_name }}
           subject-digest: ${{ needs.push-image.outputs.digest }}
           push-to-registry: true
+
 
  
   iac-scan:
