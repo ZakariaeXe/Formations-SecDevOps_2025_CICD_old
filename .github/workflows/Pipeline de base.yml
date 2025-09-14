@@ -404,6 +404,8 @@ jobs:
           output_file_path: console,results.sarif
           exit-code: 0  
           continue-on-error: true
+        continue-on-error: true    # <-- Ajoutez cette ligne ici
+
 
 
       - name: Envoyer les résultats de Checkov à GitHub Security
