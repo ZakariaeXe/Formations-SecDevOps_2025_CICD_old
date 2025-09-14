@@ -173,22 +173,22 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # ➡️ NOUVELLE ÉTAPE : Génération de la SBOM
-      - name: Generate SBOM
-        id: syft
-        uses: anchore/sbom-action@v0
-        with:
-          image: "oci:${{ steps.build.outputs.digest }}"
-          format: "spdx-json"
-          output-file: "sbom.json"
+      # # ➡️ NOUVELLE ÉTAPE : Génération de la SBOM
+      # - name: Generate SBOM
+      #   id: syft
+      #   uses: anchore/sbom-action@v0
+      #   with:
+      #     image: "oci:${{ steps.build.outputs.digest }}"
+      #     format: "spdx-json"
+      #     output-file: "sbom.json"
           
-      # ➡️ NOUVELLE ÉTAPE : Envoi du rapport SBOM comme artefact
-      - name: Upload SBOM as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom-report-${{ github.run_id }}
-          path: sbom.json
-          retention-days: 1
+      # # ➡️ NOUVELLE ÉTAPE : Envoi du rapport SBOM comme artefact
+      # - name: Upload SBOM as artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: sbom-report-${{ github.run_id }}
+      #     path: sbom.json
+      #     retention-days: 1
       
       # 5. Sauvegarde de l'image pour le job suivant
       - name: Save Docker image as artifact
@@ -220,66 +220,69 @@ jobs:
           echo "➡️  Image prête pour scan de sécurité..."
   
 
-  # sbom-generation:
-  #   name: Generate SBOM
-  #   needs: build-image # Ce job dépend de la construction de l'image
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Generate SBOM for image
-  #       uses: anchore/syft-action@v0
-  #       with:
-  #         # Utilise le nom et le digest de l'image générée dans le job précédent
-  #         image: "${{ needs.build.outputs.image_name }}@${{ needs.build.outputs.digest }}"
-  #         format: spdx-json
-  #         output-file: sbom.json
+  sbom-generation:
+    name: Generate SBOM
+    needs: build-image # Ce job dépend de la construction de l'image
+    runs-on: ubuntu-latest
+    steps:
+      # ➡️ NOUVELLE ÉTAPE : Génération de la SBOM
+      - name: Generate SBOM
+        id: syft
+        uses: anchore/sbom-action@v0
+        with:
+          image: "oci:${{ steps.build.outputs.digest }}"
+          format: "spdx-json"
+          output-file: "sbom.json"
+          
+      # ➡️ NOUVELLE ÉTAPE : Envoi du rapport SBOM comme artefact
+      - name: Upload SBOM as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-report-${{ github.run_id }}
+          path: sbom.json
+          retention-days: 1
 
-  #     - name: Envoyer le rapport SBOM comme artefact
+  # sbom-generation:
+  #   name: SBOM & Vulnerability Scan
+  #   needs: build-image # Dépend du job de build
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     packages: write
+  #     security-events: write
+  #   steps:
+  #     - name: Login to Container Registry
+  #       uses: docker/login-action@v3
+  #       with:
+  #         registry: ${{ env.REGISTRY }}
+  #         username: ${{ github.actor }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
+          
+  #     # - name: Generate SBOM
+  #     #   id: syft
+  #     #   uses: advanced-security/sbom-generator-action@v0.0.1
+  #     #   with:
+  #     #     image: "${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }}"
+  #     #     format: spdx-json
+  #     #     output-file: sbom.json
+      
+  #     - name: Generate SBOM with Syft
+  #       uses: anchore/sbom-action@v0
+  #       with:
+  #         image: "${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }}"
+  #         format: "json"
+  #         output: "sbom.json"   
+          
+  #     - name: Upload SBOM to GitHub as artifact
   #       uses: actions/upload-artifact@v4
   #       with:
   #         name: sbom-report
-  #         path: sbom.json  
+  #         path: sbom.json
 
-  sbom-generation:
-    name: SBOM & Vulnerability Scan
-    needs: build-image # Dépend du job de build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      security-events: write
-    steps:
-      - name: Login to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          
-      # - name: Generate SBOM
-      #   id: syft
-      #   uses: advanced-security/sbom-generator-action@v0.0.1
-      #   with:
-      #     image: "${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }}"
-      #     format: spdx-json
-      #     output-file: sbom.json
-      
-      - name: Generate SBOM with Syft
-        uses: anchore/sbom-action@v0
-        with:
-          image: "${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }}"
-          format: "json"
-          output: "sbom.json"   
-          
-      - name: Upload SBOM to GitHub as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom-report
-          path: sbom.json
-
-      - name: Upload SBOM to registry (as OCI artifact)
-        run: |
-          docker run --rm -v "${PWD}:/workspace" anchore/syft-action@v0 scan ${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }} --output spdx-json > sbom.json
-          cosign attach sbom sbom.json --artifact ${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }}
+  #     - name: Upload SBOM to registry (as OCI artifact)
+  #       run: |
+  #         docker run --rm -v "${PWD}:/workspace" anchore/syft-action@v0 scan ${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }} --output spdx-json > sbom.json
+  #         cosign attach sbom sbom.json --artifact ${{ needs.build-image.outputs.image_name }}@${{ needs.build-image.outputs.digest }}
 
   # 2️⃣ JOB SCAN - Scanner de sécurité des containers
   container-scan:
