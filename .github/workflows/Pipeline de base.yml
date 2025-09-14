@@ -1,4 +1,4 @@
-# Pipeline de base complète - Docker standard avec SHA et image privée
+# Pipeline de base complète - Docker standard avec SHA et image privée#
 name: Complete Basic CI/CD Pipeline
 
 on:
