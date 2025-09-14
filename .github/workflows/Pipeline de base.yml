@@ -458,7 +458,7 @@ jobs:
       - name: Generate SBOM with Syft
         uses: anchore/sbom-action@v0
         with:
-          image: "oci-archive:/tmp/image.tar" 
+          image: ${{ steps.vars.outputs.first_tag }}  
           format: "json"
           output: "sbom.json"   
           
