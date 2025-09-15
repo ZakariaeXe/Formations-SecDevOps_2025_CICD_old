@@ -12,31 +12,31 @@ env:
 
 jobs:
 
-  secret-scannings:
-    name: TruffleHog - Secret Scanning
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+  # secret-scannings:
+  #   name: TruffleHog - Secret Scanning
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     security-events: write
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
           
-      - name: Run TruffleHog filesystem scan
-        run: |
-          # Installation de TruffleHog
-          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+  #     - name: Run TruffleHog filesystem scan
+  #       run: |
+  #         # Installation de TruffleHog
+  #         curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
           
-          # Scan du filesystem (pas de comparaison git)
-          trufflehog filesystem . --format sarif --output trufflehog.sarif --no-verification || true
+  #         # Scan du filesystem (pas de comparaison git)
+  #         trufflehog filesystem . --format sarif --output trufflehog.sarif --no-verification || true
           
-      - name: Upload TruffleHog results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: trufflehog.sarif
+  #     - name: Upload TruffleHog results
+  #       uses: github/codeql-action/upload-sarif@v3
+  #       if: always()
+  #       with:
+  #         sarif_file: trufflehog.sarif
           
   secret-scanning:
     name: Gitleaks - Secret Scanning
