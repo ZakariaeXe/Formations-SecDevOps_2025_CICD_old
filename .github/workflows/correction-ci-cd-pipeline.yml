@@ -43,10 +43,48 @@ jobs:
       - name: Run Semgrep Scan
         run: semgrep scan --config auto --sarif --output semgrep.sarif || true
 
+      # 🔧 Ajout 1: installer jq portable (dans le conteneur semgrep)
+      - name: Install jq (portable)
+        run: |
+          curl -sSL -o jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+          chmod +x jq
+
+      # 🔧 Ajout 2: normaliser la sévérité pour GitHub (security-severity numérique + tag "security")
+      - name: Normalize SARIF severities for GitHub
+        run: |
+          ./jq '
+            def sevnum($s):
+              ($s|ascii_downcase) as $d |
+              if   $d=="critical" or $d=="crit" then 9.5
+              elif $d=="high"    or $d=="error" then 7.5
+              elif $d=="medium"  or $d=="warning" then 5.0
+              elif $d=="low"     or $d=="note" or $d=="info" then 2.0
+              else 3.0 end;
+
+            .runs |= map(
+              .tool.driver.rules |= (map(
+                .properties = (.properties // {}) |
+                .properties.tags = ((.properties.tags // []) + ["security"]) |
+                (.defaultConfiguration.level // .properties.severity // "warning") as $lvl |
+                .properties."security-severity" =
+                  (if (.properties."security-severity"? | type) == "number" then .properties."security-severity"
+                   else sevnum($lvl) end)
+              )) |
+              .results |= (map(
+                .properties = (.properties // {}) |
+                (.level // "warning") as $lvl |
+                .properties."security-severity" =
+                  (if (.properties."security-severity"? | type) == "number" then .properties."security-severity"
+                   else sevnum($lvl) end)
+              ))
+            )
+          ' semgrep.sarif > semgrep.ghas.sarif
+
+      # ⬇️ Utiliser le fichier normalisé
       - name: Upload Semgrep SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: semgrep.sarif
+          sarif_file: semgrep.ghas.sarif  
 
   SCA-scan:
     needs :  sast-scan  
