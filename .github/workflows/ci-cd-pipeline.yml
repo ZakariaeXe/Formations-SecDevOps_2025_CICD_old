@@ -13,7 +13,7 @@ env:
 jobs:
 #  JOB BUILD - Construction de l'image Docker
   build-image:
-    name:  BUILD - Docker Image Construction
+    name:  Prénom-Nom-Build - Docker Image Construction
     runs-on: ubuntu-latest
     
     permissions:
