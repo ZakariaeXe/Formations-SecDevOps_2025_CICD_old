@@ -12,6 +12,30 @@ env:
 
 jobs:
 
+  secret-scannings:
+    name: TruffleHog - Secret Scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Run TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          base: main
+          head: HEAD
+          extra_args: --format sarif --output trufflehog.sarif
+          
+      - name: Upload TruffleHog results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trufflehog.sarif
   secret-scaning:
     name: Gitleaks - Secret Scanning
     runs-on: ubuntu-latest
@@ -417,6 +441,30 @@ jobs:
           subject-digest: ${{ needs.push-image.outputs.digest }}
           push-to-registry: true
  
+
+  iac-scan-terra:
+    name: Terrascan - IaC Security Analysis
+    needs: push-image
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Run Terrascan
+        uses: tenable/terrascan-action@main
+        with:
+          iac_type: 'all'
+          iac_version: 'v1'
+          policy_type: 'all'
+          only_warn: true
+          sarif_upload: true
+          non_recursive: false
+          verbose: true
+  
   iac-scan:
     name: IaC Scan with Checkov
     needs: push-image
