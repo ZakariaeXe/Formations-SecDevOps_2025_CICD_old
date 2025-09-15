@@ -12,32 +12,13 @@ env:
 
 jobs:
 
-
-  secret_scan:
-    name: TruffleHog Secret Scan
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: Run TruffleHog to find secrets
-      uses: trufflesecurity/trufflehog@main
-      with:
-        path: ./
-
   secret-scaning:
-    name: secret scanning with gitleaks
+    name: Gitleaks - Secret Scanning
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - uses: gitleaks/gitleaks-action@v2
         with: 
             exit-code: 0  
@@ -46,16 +27,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   sast-scan:
-    name: Semgrep SAST Scan
+    needs : secret-scaning  
+    name: Semgrep - SAST Scan
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
     container:
       image: semgrep/semgrep
-
-    if: (github.actor != 'dependabot[bot]')
-
+    if: ${{ always() && github.actor != 'dependabot[bot]' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -69,7 +49,9 @@ jobs:
           sarif_file: semgrep.sarif
 
   SCA-scan:
-    name: Run OSV Scanner for SCA
+    needs :  sast-scan  
+    if : always()
+    name: OSV Scanner - SCA
     uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.2.2"
     permissions:
       actions: read
@@ -85,7 +67,9 @@ jobs:
 
 # 1️⃣ JOB BUILD - Construction de l'image Docker
   build-image:
-    name:  BUILD - Docker Image Construction
+    needs : SCA-scan
+    if : always()
+    name:  Build - Docker Image Construction
     runs-on: ubuntu-latest
     
     permissions:
@@ -162,15 +146,6 @@ jobs:
           image: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
           format: spdx-json
           artifact-name: sbom-${{ github.run_id }}.spdx.json
-          
-      # - name: Generate SBOM with Syft
-      #   uses: anchore/sbom-action@v0
-      #   with:
-      #     image: ${{ steps.vars.outputs.first_tag }}  
-      #     format: spdx-json
-      #     artifact-name: sbom-${{ github.run_id }}.spdx.json
-      
-
       # 5. Sauvegarde de l'image pour le job suivant
       - name: Save Docker image as artifact
         run: |
@@ -203,7 +178,7 @@ jobs:
 
   # 2️⃣ JOB SCAN - Scanner de sécurité des containers
   container-scan:
-    name: 🔍 SCAN - Container Security Analysis  
+    name: Trivy - Container Security Analysis  
     runs-on: ubuntu-latest
     needs: build-image
     
@@ -286,7 +261,7 @@ jobs:
   
   # 3️⃣ JOB PUSH - Publication de l'image Docker  
   push-image:
-    name: 🚀 PUSH - Docker Image Publication
+    name: Push - Docker Image Publication
     runs-on: ubuntu-latest
     needs: [build-image, container-scan]
     
@@ -438,11 +413,11 @@ jobs:
           subject-name: ${{ needs.push-image.outputs.image_name }}
           subject-digest: ${{ needs.push-image.outputs.digest }}
           push-to-registry: true
-
-
  
   iac-scan:
     name: IaC Scan with Checkov
+    needs: push-image
+    if : always()
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -459,8 +434,6 @@ jobs:
           exit-code: 0  
           continue-on-error: true
         continue-on-error: true    # <-- Ajoutez cette ligne ici
-
-
 
       - name: Envoyer les résultats de Checkov à GitHub Security
         uses: github/codeql-action/upload-sarif@v3
