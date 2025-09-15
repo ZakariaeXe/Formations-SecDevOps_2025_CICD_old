@@ -35,10 +35,6 @@ jobs:
       contents: read
       security-events: write
       actions: read
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [ 'python', 'javascript' ]  # Ajustez selon votre projet
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -46,15 +42,14 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: ${{ matrix.language }}
+          languages: python
+          queries: security-extended,security-and-quality
           
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
         
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{matrix.language}}"
         
   SCA-scan:
     needs :  sast-scan  
