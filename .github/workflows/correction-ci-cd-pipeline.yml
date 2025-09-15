@@ -65,7 +65,7 @@ jobs:
       fail-on-vuln: false
 
 
-# 1️⃣ JOB BUILD - Construction de l'image Docker
+#  JOB BUILD - Construction de l'image Docker
   build-image:
     needs : SCA-scan
     if : always()
@@ -99,7 +99,7 @@ jobs:
           echo "image_fqn=${{ env.REGISTRY }}/$norm" >> $GITHUB_OUTPUT
           echo "Using image: ${{ env.REGISTRY }}/$norm"
       
-      # 2. Authentification au GitHub Container Registry
+      # Authentification au GitHub Container Registry
       - name: Login to Container Registry
         uses: docker/login-action@v3
         with:
@@ -107,7 +107,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      # 3. Configuration des métadonnées avec SHA prioritaire
+      #  Configuration des métadonnées avec SHA prioritaire
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -129,7 +129,7 @@ jobs:
             # 🔒 Configuration pour image privée
             org.opencontainers.image.visibility=private
   
-      # 4. Build Docker image SEULEMENT (sans push)
+      #  Build Docker image SEULEMENT (sans push)
       - name: Build Docker image locally
         id: build
         uses: docker/build-push-action@v5
@@ -146,7 +146,7 @@ jobs:
           image: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
           format: spdx-json
           artifact-name: sbom-${{ github.run_id }}.spdx.json
-      # 5. Sauvegarde de l'image pour le job suivant
+      #  Sauvegarde de l'image pour le job suivant
       - name: Save Docker image as artifact
         run: |
           echo "💾 Sauvegarde de l'image pour le job de scan..."
@@ -162,7 +162,7 @@ jobs:
           path: docker-image.tar.gz
           retention-days: 1
   
-      # 6. Affichage des informations de build
+      #  Affichage des informations de build
       - name: Display build information
         run: |
           echo "🎉 === BUILD TERMINÉ AVEC SUCCÈS ==="
@@ -176,7 +176,7 @@ jobs:
           echo "➡️  Image prête pour scan de sécurité..."
   
 
-  # 2️⃣ JOB SCAN - Scanner de sécurité des containers
+  #  JOB SCAN - Scanner de sécurité des containers
   container-scan:
     name: Trivy - Container Security Analysis  
     runs-on: ubuntu-latest
@@ -194,17 +194,17 @@ jobs:
       high_count: ${{ steps.scan-status.outputs.high }}
       
     steps:
-      # 1. Récupération du code (pour contexte)
+      #  Récupération du code (pour contexte)
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      # 2. Téléchargement de l'image construite
+      #  Téléchargement de l'image construite
       - name: Download image artifact
         uses: actions/download-artifact@v4
         with:
           name: docker-image-${{ github.run_id }}
       
-      # 3. Chargement de l'image Docker
+      #  Chargement de l'image Docker
       - name: Load Docker image
         run: |
           echo "📥 Chargement de l'image Docker..."
@@ -212,7 +212,7 @@ jobs:
           echo "✅ Image chargée avec succès"
           docker images
       
-      # 4. Scanner Trivy sur l'image
+      # Scanner Trivy sur l'image
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
@@ -223,7 +223,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
         continue-on-error: true
       
-      # 5. Upload des résultats vers GitHub Security
+      #  Upload des résultats vers GitHub Security
       - name: Upload Trivy scan results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         if: always()
@@ -231,7 +231,7 @@ jobs:
           sarif_file: trivy-results.sarif
         continue-on-error: true 
   
-      # 6. Analyse des résultats et création du statut
+      #  Analyse des résultats et création du statut
       - name: Analyze scan results
         id: scan-status
         run: |
@@ -259,7 +259,7 @@ jobs:
             echo "⚠️ No scan results file found."
           fi
   
-  # 3️⃣ JOB PUSH - Publication de l'image Docker  
+  # JOB PUSH - Publication de l'image Docker  
   push-image:
     name: Push - Docker Image Publication
     runs-on: ubuntu-latest
@@ -278,11 +278,11 @@ jobs:
       tags: ${{ needs.build-image.outputs.tags }}
       
     steps:
-      # 1. Récupération du code source
+      #  Récupération du code source
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      # 2. Authentification au GitHub Container Registry
+      #  Authentification au GitHub Container Registry
       - name: Login to Container Registry
         uses: docker/login-action@v3
         with:
@@ -290,7 +290,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      # 3. Affichage du statut de scan
+      #  Affichage du statut de scan
       - name: Display security scan status
         run: |
           echo "🔍 === STATUT DU SCAN DE SÉCURITÉ ==="
@@ -305,7 +305,7 @@ jobs:
             # exit 1
           fi
       
-      # 4. Reconstruction et Push (nécessaire pour obtenir le vrai digest)
+      #  Reconstruction et Push (nécessaire pour obtenir le vrai digest)
       - name: Extract metadata (for push)
         id: meta
         uses: docker/metadata-action@v5
@@ -324,7 +324,7 @@ jobs:
             org.opencontainers.image.created={{date 'YYYY-MM-DDTHH:mm:ssZ'}}
             org.opencontainers.image.visibility=private
       
-      # 5. Build final et Push pour obtenir le digest définitif
+      #  Build final et Push pour obtenir le digest définitif
       - name: Build and push Docker image
         id: push
         uses: docker/build-push-action@v5
@@ -334,13 +334,13 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
   
-      # 6. Configuration de l'image comme privée
+      #  Configuration de l'image comme privée
       - name: Set image visibility to private
         run: |
           echo "🔒 Configuration de l'image comme privée..."
           echo "Image sera automatiquement configurée comme privée"
       
-      # 7. Affichage des informations finales
+      #  Affichage des informations finales
       - name: Display complete build information
         run: |
           echo "🎉 === PIPELINE TERMINÉ AVEC SUCCÈS ==="
@@ -394,7 +394,7 @@ jobs:
           }
           echo "✅ Image trouvée et accessible"
       
-      # ✅ NOUVEAU: Attendre que l'image soit complètement disponible
+      #  NOUVEAU: Attendre que l'image soit complètement disponible
       - name: Wait for image availability
         run: |
           echo "⏳ Attente de la disponibilité complète de l'image..."
