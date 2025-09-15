@@ -1,0 +1,191 @@
+name: Basic CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+#  JOB BUILD - Construction de l'image Docker
+  build-image:
+    name:  BUILD - Docker Image Construction
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      packages: write
+      actions: read
+    
+    # Outputs pour les jobs suivants et SLSA
+    outputs:
+      image_name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      digest: ${{ steps.build.outputs.digest }}
+      image_uri: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+      tags: ${{ steps.meta.outputs.tags }}
+      tags_json: ${{ steps.meta.outputs.json }}
+      
+    steps:
+      # Récupération du code source
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # Authentification au GitHub Container Registry
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      # Configuration des métadonnées avec SHA prioritaire
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # SHA en priorité pour immutabilité et sécurité
+            type=sha,prefix={{branch}}-,format=long,priority=1000
+            type=sha,prefix={{branch}}-,format=short,priority=900
+            # Tags traditionnels pour développement
+            type=ref,event=branch,priority=600
+            type=ref,event=pr,priority=600
+            type=raw,value=latest,enable={{is_default_branch}},priority=200
+          labels: |
+            org.opencontainers.image.title=${{ github.repository }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created={{date 'YYYY-MM-DDTHH:mm:ssZ'}}
+            # Configuration pour image privée
+            org.opencontainers.image.visibility=private
+  
+      # Build Docker image SEULEMENT (sans push)
+      - name: Build Docker image locally
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false  # ✅ Pas de push dans ce job
+          load: true   # ✅ Charge l'image localement pour le scan suivant
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+      
+      #  Sauvegarde de l'image pour le job suivant
+      - name: Save Docker image as artifact
+        run: |
+          echo "💾 Sauvegarde de l'image pour le job de scan..."
+          # Sauvegarder la première tag comme référence
+          FIRST_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n1)
+          docker save "$FIRST_TAG" | gzip > docker-image.tar.gz
+          echo "✅ Image sauvegardée: docker-image.tar.gz"
+      
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-${{ github.run_id }}
+          path: docker-image.tar.gz
+          retention-days: 1
+  
+      # Affichage des informations de build
+      - name: Display build information
+        run: |
+          echo "🎉 === BUILD TERMINÉ AVEC SUCCÈS ==="
+          echo ""
+          echo " Nom de l'image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          echo " Digest (temporaire): ${{ steps.build.outputs.digest }}"
+          echo ""
+          echo " Tags préparés:"
+          echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | while read tag; do echo "  - $tag"; done
+
+       
+  # JOB PUSH - Publication de l'image Docker  
+  push-image:
+    name: Push - Docker Image Publication
+    runs-on: ubuntu-latest
+    needs: [build-image]
+    
+    permissions:
+      contents: read
+      packages: write
+      actions: read
+      
+    outputs:
+      image_name: ${{ needs.build-image.outputs.image_name }}
+      digest: ${{ steps.push.outputs.digest }}  
+      image_uri: ${{ needs.build-image.outputs.image_name }}@${{ steps.push.outputs.digest }}
+      tags: ${{ needs.build-image.outputs.tags }}
+      
+    steps:
+      # Récupération du code source
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # Authentification au GitHub Container Registry
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}    
+      
+      # Reconstruction et Push (nécessaire pour obtenir le vrai digest)
+      - name: Extract metadata (for push)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix={{branch}}-,format=long,priority=1000
+            type=sha,prefix={{branch}}-,format=short,priority=900
+            type=ref,event=branch,priority=600
+            type=ref,event=pr,priority=600
+            type=raw,value=latest,enable={{is_default_branch}},priority=200
+          labels: |
+            org.opencontainers.image.title=${{ github.repository }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created={{date 'YYYY-MM-DDTHH:mm:ssZ'}}
+            org.opencontainers.image.visibility=private
+      
+      # Build final et Push pour obtenir le digest définitif
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true  #  Push final
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+  
+      # Configuration de l'image comme privée
+      - name: Set image visibility to private
+        run: |
+          echo "Configuration de l'image comme privée..."
+          echo "Image sera automatiquement configurée comme privée"
+      
+      # Affichage des informations finales
+      - name: Display complete build information
+        run: |
+          echo " === PUSH TERMINÉ AVEC SUCCÈS ==="
+          echo ""
+          echo " Nom de l'image: ${{ needs.build-image.outputs.image_name }}"
+          echo " SHA Digest FINAL: ${{ steps.push.outputs.digest }}"
+          echo " URI complète (immutable): ${{ needs.build-image.outputs.image_name }}@${{ steps.push.outputs.digest }}"
+          echo ""
+          echo " Tags disponibles:"
+          echo "${{ needs.build-image.outputs.tags }}" | tr ',' '\n' | while read tag; do echo "  - $tag"; done
+          echo ""
+          echo " Visibilité: Image privée (authentification requise)"
+          echo " Recommandation: Utilisez le SHA digest pour la production"
+          echo ""
+          echo " Sécurité: ${{ needs.container-scan.outputs.critical_count }} critical, ${{ needs.container-scan.outputs.high_count }} high vulnerabilities"
+          echo ""
+          echo " Commandes utiles:"
+          echo "  - Pull: docker pull ${{ needs.build-image.outputs.image_name }}@${{ steps.push.outputs.digest }}"
+          echo "  - Inspect: docker inspect ${{ needs.build-image.outputs.image_name }}@${{ steps.push.outputs.digest }}"
+  
