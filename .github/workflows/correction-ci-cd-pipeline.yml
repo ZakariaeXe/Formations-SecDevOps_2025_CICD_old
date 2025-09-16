@@ -12,19 +12,40 @@ env:
 
 jobs:     
         
+  # secret-scaning:
+  #   name: Gitleaks - Secret Scanning
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+  #     - uses: gitleaks/gitleaks-action@v2
+  #       with: 
+  #           exit-code: 0  
+  #       continue-on-error: true
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   secret-scaning:
-    name: Gitleaks - Secret Scanning
+    name: TruffleHog - Secret Scanning
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        with: 
-            exit-code: 0  
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ""
+          head: ""
+          extra_args: --log-level=2 --results=verified,unknown
+          
 
   sast-scan:
     name: CodeQL - SAST Analysis
