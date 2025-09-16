@@ -43,7 +43,7 @@ jobs:
         with:
           path: ./
           base: ""
-          head: ""
+          head: HEAD        
           extra_args: --log-level=2 --results=verified,unknown
           
 
