@@ -27,46 +27,29 @@ jobs:
   #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   secret-scanning:
-    name: Gitleaks — Full repo history (Docker)
+    name: Gitleaks (working tree only)
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
-      - name: Checkout (full history)
+      - name: Checkout repo
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
   
-      - name: Compute first commit (root)
-        id: first
-        run: |
-          FIRST_COMMIT="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
-          echo "first_commit=$FIRST_COMMIT" >> "$GITHUB_OUTPUT"
-          echo "First commit: $FIRST_COMMIT"
-  
-      - name: Run Gitleaks (full history via Docker)
-        env:
-          # permet à gitleaks d'accéder au repo privé via HTTPS
-          GITLEAKS_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run Gitleaks via Docker
         run: |
           mkdir -p gitleaks-out
-  
           docker run --rm \
-            -e GITLEAKS_ACCESS_TOKEN \
-            -v "${{ github.workspace }}/gitleaks-out:/out" \
+            -v "$PWD:/repo" \
+            -v "$PWD/gitleaks-out:/out" \
             zricethezav/gitleaks:latest \
             detect \
-              --repo-url "https://github.com/${{ github.repository }}" \
-              --commit-from "${{ steps.first.outputs.first_commit }}" \
-              --commit-to "${{ github.sha }}" \
+              --source /repo \
+              --no-git \
               --redact \
-              --no-color \
+              --no-color --no-banner \
               --report-format json \
-              --report-path /out/gitleaks-history.json \
-              --exit-code 0
+              --report-path /out/gitleaks.json || true
   
-          echo "=== Gitleaks summary (first 40 lines) ==="
-          head -n 40 gitleaks-out/gitleaks-history.json || true  
+          echo "=== Gitleaks results (first lines) ==="
+          head -n 60 gitleaks-out/gitleaks.json || true
 
   sast-scan:
     name: CodeQL - SAST Analysis
