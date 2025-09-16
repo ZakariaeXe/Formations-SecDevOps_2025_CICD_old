@@ -12,20 +12,6 @@ env:
 
 jobs:     
         
-  # secret-scanning:
-  #   name: Gitleaks - Secret Scanning
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         fetch-depth: 0
-  #     - uses: gitleaks/gitleaks-action@v2
-  #       with: 
-  #           exit-code: 0  
-  #       continue-on-error: true
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   secret-scanning:
     name: Gitleaks — Secret Scaning 
     runs-on: ubuntu-latest
