@@ -12,7 +12,7 @@ env:
 
 jobs:     
         
-  # secret-scaning:
+  # secret-scanning:
   #   name: Gitleaks - Secret Scanning
   #   runs-on: ubuntu-latest
   #   steps:
@@ -26,31 +26,84 @@ jobs:
   #       env:
   #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-
-  secret-scaning:
-    name: TruffleHog - Secret Scanning
+  secret-scanning:
+    name: Gitleaks - Full repo & history
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0           # indispensable pour voir tout l'historique
+  
+      # 1) Scan du working tree (tous les fichiers à HEAD)
+      - name: Gitleaks (working tree)
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: >
+            detect
+            --source .
+            --no-git
+            --report-format sarif
+            --report-path gitleaks-dir.sarif
+            --exit-code 0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+  
+      # 2) Scan de TOUT l’historique Git (toutes branches/racines atteignables)
+      - name: Gitleaks (full history)
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: >
+            detect
+            --source .
+            --log-opts="--all --full-history"
+            --report-format sarif
+            --report-path gitleaks-git.sarif
+            --exit-code 0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+  
+      # Publie les deux rapports dans l’onglet Security
+      - name: Upload SARIF (HEAD)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gitleaks-dir.sarif
+          category: gitleaks-dir
+      - name: Upload SARIF (history)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gitleaks-git.sarif
+          category: gitleaks-history
+
+
+  # secret-scanning:
+  #   name: TruffleHog - Secret Scanning
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     security-events: write
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
           
-      - name: TruffleHog OSS
-        uses: trufflesecurity/trufflehog@main
-        with:
-          path: ./
-          base: ""
-          head: HEAD        
-          extra_args: --log-level=2 --results=verified,unknown
+  #     - name: TruffleHog OSS
+  #       uses: trufflesecurity/trufflehog@main
+  #       with:
+  #         path: ./
+  #         base: ""
+  #         head: HEAD        
+  #         extra_args: --log-level=2 --results=verified,unknown
           
 
   sast-scan:
     name: CodeQL - SAST Analysis
-    needs: secret-scaning
+    needs: secret-scanning
     if: ${{ always() && github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     permissions:
@@ -439,148 +492,23 @@ jobs:
           subject-digest: ${{ needs.push-image.outputs.digest }}
           push-to-registry: true
  
-  terrascan_job:
+  IaC-Scan:
+    needs: push-image
     runs-on: ubuntu-latest
-    name: Terrascan (SARIF → Security)
     permissions:
       contents: read
       security-events: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - name: Run KICS
+        uses: checkmarx/kics-github-action@v2.1.13
         with:
-          fetch-depth: 0
-  
-      # Génère juste le fichier SARIF; ne bloque pas le job
-      - name: Run Terrascan
-        id: terrascan
-        uses: tenable/terrascan-action@main
+          path: '.'
+          output_formats: 'sarif'
+          output_path: 'results/'
+          ignore_on_exit: 'results'
+      - uses: github/codeql-action/upload-sarif@v3
         with:
-          iac_type: terraform
-          iac_version: v14
-          policy_type: aws
-          sarif_upload: true          # => crée 'terrascan.sarif'
-          only_warn: true             # => n'échoue pas si findings
-        continue-on-error: true       # => le step reste vert même s'il trouve des issues
+          sarif_file: results/results.sarif
 
-      - name: Normalize SARIF severities for GHAS
-        if: always()
-        run: |
-          jq -e '
-            def sevnum($s):
-              ($s|tostring|ascii_downcase) as $d |
-              if   $d=="error"   or $d=="high"   then 8.0
-              elif $d=="warning" or $d=="medium" then 5.0
-              elif $d=="note"    or $d=="low"    then 2.0
-              else 3.0 end;
-  
-            .runs |= map(
-              (if (.tool.driver.rules|type)=="array" then
-                .tool.driver.rules |= map(
-                  .properties = (.properties // {}) |
-                  .properties.tags = ((.properties.tags // []) + ["security"] | unique) |
-                  .properties."security-severity" =
-                    (if (.properties."security-severity"? | type)=="number"
-                     then .properties."security-severity" else 5.0 end)
-                )
-              else . end)
-              |
-              (if (.results|type)=="array" then
-                .results |= map(
-                  .properties = (.properties // {}) |
-                  .properties."security-severity" =
-                    (if (.properties."security-severity"? | type)=="number"
-                     then .properties."security-severity"
-                     else sevnum(.level // "warning") end)
-                )
-              else . end)
-            )
-          ' terrascan.sarif > terrascan.ghas.sarif
-          mv terrascan.ghas.sarif terrascan.sarif
-  
-      - name: Upload SARIF to GitHub Security
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: terrascan.sarif
-  
-      # # Upload vers l'onglet Security (GHAS)
-      # - name: Upload SARIF to GitHub Security
-      #   if: always()                  # => uploade même si le step précédent a “échoué”
-      #   uses: github/codeql-action/upload-sarif@v3
-      #   with:
-      #     sarif_file: terrascan.sarif
-      #     # optionnel: séparer l’outil dans l’UI si tu veux
-      #     # category: terrascan-iac
-        
-  # kics-iac:
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: read
-  #     security-events: write
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Run KICS
-  #       uses: checkmarx/kics-github-action@v2.1.13
-  #       with:
-  #         path: '.'
-  #         output_formats: 'sarif'
-  #         output_path: 'results/'
-  #         ignore_on_exit: 'results'
-  #     - uses: github/codeql-action/upload-sarif@v3
-  #       with:
-  #         sarif_file: results/results.sarif
-  # terrascan_job:
-  #   runs-on: ubuntu-latest
-  #   name: terrascan-action
-  #   steps:
-  #   - name: Checkout repository
-  #     uses: actions/checkout@v2
-  #   - name: Run Terrascan
-  #     id: terrascan
-  #     uses: tenable/terrascan-action@main
-  #     with:
-  #       iac_type: 'terraform'
-  #       iac_version: 'v14'
-  #       policy_type: 'aws'
-  #       only_warn: true
-  #       sarif_upload: true
-  #       #non_recursive:
-  #       #iac_dir:
-  #       #policy_path:
-  #       #skip_rules:
-  #       #config_path:
-  #       #webhook_url:
-  #       #webhook_token:
-  #   - name: Upload SARIF file
-  #     uses: github/codeql-action/upload-sarif@v1
-  #     with:
-  #       sarif_file: terrascan.sarif
-  # iac-scan:
-  #   name: IaC Scan with Checkov
-  #   needs: push-image
-  #   if : always()
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: read
-  #     security-events: write
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
 
-  #     - name: Run Checkov
-  #       uses: bridgecrewio/checkov-action@v12
-  #       with:
-  #         output_format: sarif
-  #         output_file_path: console,results.sarif
-  #         exit-code: 0  
-  #         continue-on-error: true
-  #       continue-on-error: true    # <-- Ajoutez cette ligne ici
-
-  #     - name: Envoyer les résultats de Checkov à GitHub Security
-  #       uses: github/codeql-action/upload-sarif@v3
-  #       if: success() || failure()
-  #       with:
-  #         sarif_file: results.sarif
-  #         exit-code: 0  
-  #         continue-on-error: true
