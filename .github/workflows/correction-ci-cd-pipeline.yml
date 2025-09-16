@@ -26,6 +26,7 @@ jobs:
   #       env:
   #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+
   secret-scaning:
     name: TruffleHog - Secret Scanning
     runs-on: ubuntu-latest
@@ -461,15 +462,56 @@ jobs:
           sarif_upload: true          # => crée 'terrascan.sarif'
           only_warn: true             # => n'échoue pas si findings
         continue-on-error: true       # => le step reste vert même s'il trouve des issues
+
+      - name: Normalize SARIF severities for GHAS
+        if: always()
+        run: |
+          jq -e '
+            def sevnum($s):
+              ($s|tostring|ascii_downcase) as $d |
+              if   $d=="error"   or $d=="high"   then 8.0
+              elif $d=="warning" or $d=="medium" then 5.0
+              elif $d=="note"    or $d=="low"    then 2.0
+              else 3.0 end;
   
-      # Upload vers l'onglet Security (GHAS)
+            .runs |= map(
+              (if (.tool.driver.rules|type)=="array" then
+                .tool.driver.rules |= map(
+                  .properties = (.properties // {}) |
+                  .properties.tags = ((.properties.tags // []) + ["security"] | unique) |
+                  .properties."security-severity" =
+                    (if (.properties."security-severity"? | type)=="number"
+                     then .properties."security-severity" else 5.0 end)
+                )
+              else . end)
+              |
+              (if (.results|type)=="array" then
+                .results |= map(
+                  .properties = (.properties // {}) |
+                  .properties."security-severity" =
+                    (if (.properties."security-severity"? | type)=="number"
+                     then .properties."security-severity"
+                     else sevnum(.level // "warning") end)
+                )
+              else . end)
+            )
+          ' terrascan.sarif > terrascan.ghas.sarif
+          mv terrascan.ghas.sarif terrascan.sarif
+  
       - name: Upload SARIF to GitHub Security
-        if: always()                  # => uploade même si le step précédent a “échoué”
+        if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: terrascan.sarif
-          # optionnel: séparer l’outil dans l’UI si tu veux
-          # category: terrascan-iac
+  
+      # # Upload vers l'onglet Security (GHAS)
+      # - name: Upload SARIF to GitHub Security
+      #   if: always()                  # => uploade même si le step précédent a “échoué”
+      #   uses: github/codeql-action/upload-sarif@v3
+      #   with:
+      #     sarif_file: terrascan.sarif
+      #     # optionnel: séparer l’outil dans l’UI si tu veux
+      #     # category: terrascan-iac
         
   # kics-iac:
   #   runs-on: ubuntu-latest
