@@ -27,13 +27,13 @@ jobs:
   #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   secret-scanning:
-    name: Gitleaks (working tree only)
+    name: Gitleaks — JSON report
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
   
-      - name: Run Gitleaks via Docker
+      - name: Run Gitleaks (JSON)
         run: |
           mkdir -p gitleaks-out
           docker run --rm \
@@ -43,13 +43,18 @@ jobs:
             detect \
               --source /repo \
               --no-git \
-              --redact \
-              --no-color --no-banner \
+              --no-color --no-banner --redact \
               --report-format json \
-              --report-path /out/gitleaks.json || true
+              --report-path /out/gitleaks.json \
+              --exit-code 0
+          echo "Saved report to gitleaks-out/gitleaks.json"
   
-          echo "=== Gitleaks results (first lines) ==="
-          head -n 60 gitleaks-out/gitleaks.json || true
+      - name: Upload JSON report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-json-${{ github.run_id }}
+          path: gitleaks-out/gitleaks.json
+          if-no-files-found: error
 
   sast-scan:
     name: CodeQL - SAST Analysis
