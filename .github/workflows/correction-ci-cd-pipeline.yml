@@ -27,79 +27,46 @@ jobs:
   #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   secret-scanning:
-    name: Gitleaks - Full repo & history
+    name: Gitleaks — Full repo history (Docker)
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0           # indispensable pour voir tout l'historique
+          fetch-depth: 0
   
-      # 1) Scan du working tree (tous les fichiers à HEAD)
-      - name: Gitleaks (working tree)
-        uses: gitleaks/gitleaks-action@v2
-        with:
-          args: >
-            detect
-            --source .
-            --no-git
-            --report-format sarif
-            --report-path gitleaks-dir.sarif
-            --exit-code 0
+      - name: Compute first commit (root)
+        id: first
+        run: |
+          FIRST_COMMIT="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+          echo "first_commit=$FIRST_COMMIT" >> "$GITHUB_OUTPUT"
+          echo "First commit: $FIRST_COMMIT"
+  
+      - name: Run Gitleaks (full history via Docker)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
+          # permet à gitleaks d'accéder au repo privé via HTTPS
+          GITLEAKS_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p gitleaks-out
   
-      # 2) Scan de TOUT l’historique Git (toutes branches/racines atteignables)
-      - name: Gitleaks (full history)
-        uses: gitleaks/gitleaks-action@v2
-        with:
-          args: >
-            detect
-            --source .
-            --log-opts="--all --full-history"
-            --report-format sarif
-            --report-path gitleaks-git.sarif
-            --exit-code 0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
+          docker run --rm \
+            -e GITLEAKS_ACCESS_TOKEN \
+            -v "${{ github.workspace }}/gitleaks-out:/out" \
+            zricethezav/gitleaks:latest \
+            detect \
+              --repo-url "https://github.com/${{ github.repository }}" \
+              --commit-from "${{ steps.first.outputs.first_commit }}" \
+              --commit-to "${{ github.sha }}" \
+              --redact \
+              --no-color \
+              --report-format json \
+              --report-path /out/gitleaks-history.json \
+              --exit-code 0
   
-      # Publie les deux rapports dans l’onglet Security
-      - name: Upload SARIF (HEAD)
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: gitleaks-dir.sarif
-          category: gitleaks-dir
-      - name: Upload SARIF (history)
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: gitleaks-git.sarif
-          category: gitleaks-history
-
-
-  # secret-scanning:
-  #   name: TruffleHog - Secret Scanning
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: read
-  #     security-events: write
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
-  #       with:
-  #         fetch-depth: 0
-          
-  #     - name: TruffleHog OSS
-  #       uses: trufflesecurity/trufflehog@main
-  #       with:
-  #         path: ./
-  #         base: ""
-  #         head: HEAD        
-  #         extra_args: --log-level=2 --results=verified,unknown
-          
+          echo "=== Gitleaks summary (first 40 lines) ==="
+          head -n 40 gitleaks-out/gitleaks-history.json || true  
 
   sast-scan:
     name: CodeQL - SAST Analysis
