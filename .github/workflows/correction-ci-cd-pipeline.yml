@@ -438,23 +438,56 @@ jobs:
           subject-digest: ${{ needs.push-image.outputs.digest }}
           push-to-registry: true
  
-  kics-iac:
+  terrascan_job:
     runs-on: ubuntu-latest
+    name: Terrascan (SARIF → Security)
     permissions:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
-      - name: Run KICS
-        uses: checkmarx/kics-github-action@v2.1.13
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          path: '.'
-          output_formats: 'sarif'
-          output_path: 'results/'
-          ignore_on_exit: 'results'
-      - uses: github/codeql-action/upload-sarif@v3
+          fetch-depth: 0
+  
+      # Génère juste le fichier SARIF; ne bloque pas le job
+      - name: Run Terrascan
+        id: terrascan
+        uses: tenable/terrascan-action@main
         with:
-          sarif_file: results/results.sarif
+          iac_type: terraform
+          iac_version: v14
+          policy_type: aws
+          sarif_upload: true          # => crée 'terrascan.sarif'
+          only_warn: true             # => n'échoue pas si findings
+        continue-on-error: true       # => le step reste vert même s'il trouve des issues
+  
+      # Upload vers l'onglet Security (GHAS)
+      - name: Upload SARIF to GitHub Security
+        if: always()                  # => uploade même si le step précédent a “échoué”
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: terrascan.sarif
+          # optionnel: séparer l’outil dans l’UI si tu veux
+          # category: terrascan-iac
+        
+  # kics-iac:
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     security-events: write
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Run KICS
+  #       uses: checkmarx/kics-github-action@v2.1.13
+  #       with:
+  #         path: '.'
+  #         output_formats: 'sarif'
+  #         output_path: 'results/'
+  #         ignore_on_exit: 'results'
+  #     - uses: github/codeql-action/upload-sarif@v3
+  #       with:
+  #         sarif_file: results/results.sarif
   # terrascan_job:
   #   runs-on: ubuntu-latest
   #   name: terrascan-action
