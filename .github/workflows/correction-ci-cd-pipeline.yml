@@ -84,7 +84,7 @@ jobs:
       fail-on-vuln: false
 
 
-#  JOB BUILD - Construction de l'image Docker
+#  JOB BUILD IMAGE - Construction de l'image Docker
   build-image:
     needs : SCA-scan
     if : always()
